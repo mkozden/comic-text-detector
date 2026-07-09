@@ -128,7 +128,7 @@ class TextDetector:
             self.net = TextDetBaseDNN(input_size, model_path)
             self.backend = 'opencv'
         else:
-            self.net = TextDetBase(model_path, device=device, act=act)
+            self.net = TextDetBase(model_path, device=device, half=half, act=act)
             self.backend = 'torch'
         
         if isinstance(input_size, int):
@@ -141,7 +141,7 @@ class TextDetector:
         self.seg_rep = SegDetectorRepresenter(thresh=0.3)
 
     @torch.no_grad()
-    def __call__(self, img, refine_mode=REFINEMASK_INPAINT, keep_undetected_mask=False):
+    def __call__(self, img, refine_mode=REFINEMASK_INPAINT, keep_undetected_mask=False, skip_refine=False):
         img_in, ratio, dw, dh = preprocess_img(img, input_size=self.input_size, device=self.device, half=self.half, to_tensor=self.backend=='torch')
         im_h, im_w = img.shape[:2]
 
@@ -173,9 +173,12 @@ class TextDetector:
             lines[..., 1] *= resize_ratio[1]
             lines = lines.astype(np.int32)
         blk_list = group_output(blks, lines, im_w, im_h, mask)
-        mask_refined = refine_mask(img, mask, blk_list, refine_mode=refine_mode)
-        if keep_undetected_mask:
-            mask_refined = refine_undetected_mask(img, mask, mask_refined, blk_list, refine_mode=refine_mode)
+        if skip_refine:
+            mask_refined = mask
+        else:
+            mask_refined = refine_mask(img, mask, blk_list, refine_mode=refine_mode)
+            if keep_undetected_mask:
+                mask_refined = refine_undetected_mask(img, mask, mask_refined, blk_list, refine_mode=refine_mode)
     
         return mask, mask_refined, blk_list
 
